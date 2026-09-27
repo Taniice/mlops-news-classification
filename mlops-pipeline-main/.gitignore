@@ -10,7 +10,9 @@ data/processed/
 # MLflow 
 mlruns/ 
 # Reports 
-reports/ 
+reports/*
+!reports/*.md
+!reports/*.txt 
 # Conda 
 .conda/ 
 venv/ 

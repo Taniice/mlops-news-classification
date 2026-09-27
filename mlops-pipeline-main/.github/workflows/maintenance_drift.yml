@@ -1,0 +1,52 @@
+name: Pipeline de Mantenimiento — Monitoreo Continuo de Data Drift
+
+on:
+  schedule:
+    # Ejecución programada diaria: a las 00:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      drift_threshold:
+        description: "Umbral de PSI para alertar Drift (default: 0.15)"
+        required: false
+        default: "0.15"
+
+jobs:
+  monitor-drift:
+    name: 📊 Chequeo de Data Drift y Calidad
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Instalar dependencias de monitoreo
+        run: |
+          pip install --upgrade pip
+          pip install pandas numpy pyyaml evidently
+
+      - name: Ejecutar análisis de deriva con Evidently AI & PSI
+        id: run_monitor
+        run: |
+          python monitoring/monitor.py
+        continue-on-error: true
+
+      - name: Publicar reporte HTML de Drift
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidently-drift-report
+          path: reports/drift_report.html
+          retention-days: 14
+
+      - name: Resumen y Alertas en GitHub
+        run: |
+          echo "## 📊 Reporte de Monitoreo de Data Drift" >> $GITHUB_STEP_SUMMARY
+          if [ -f "reports/drift_summary.json" ]; then
+            cat reports/drift_summary.json >> $GITHUB_STEP_SUMMARY
+          fi

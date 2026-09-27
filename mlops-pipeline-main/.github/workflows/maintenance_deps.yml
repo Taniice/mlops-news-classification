@@ -1,0 +1,39 @@
+name: Pipeline de Mantenimiento — Auditoría y Actualización de Dependencias
+
+on:
+  schedule:
+    # Ejecución programada semanal: todos los lunes a las 04:00 UTC
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit-dependencies:
+    name: 🛡️ Auditoría de Seguridad y Paquetes Desactualizados
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Instalar dependencias actuales y herramientas de auditoría
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit
+
+      - name: Escaneo de vulnerabilidades conocidas (CVEs)
+        run: |
+          pip-audit --desc || echo "⚠️ Se detectaron avisos de seguridad en dependencias."
+
+      - name: Listar librerías con nuevas versiones disponibles
+        run: |
+          echo "## 📦 Reporte de Dependencias Desactualizadas" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          pip list --outdated >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

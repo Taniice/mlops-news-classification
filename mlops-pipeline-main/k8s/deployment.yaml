@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-news-classifier-api
+  labels:
+    app: news-classifier
+    tier: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: news-classifier
+  template:
+    metadata:
+      labels:
+        app: news-classifier
+    spec:
+      containers:
+        - name: api-container
+          image: omer022/mlops-news-classifier:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow-service:5000"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PYTHONUTF8
+              value: "1"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1536Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15

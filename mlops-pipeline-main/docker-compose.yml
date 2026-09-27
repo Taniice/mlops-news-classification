@@ -59,6 +59,7 @@ services:
       - PYTHONUNBUFFERED=1
       - PYTHONUTF8=1
     volumes:
+      - ./src:/app/src
       - ./models:/app/models:ro          # ← bind mount your existing pkl
       - ./data/processed:/app/data/processed:ro
       - ./params.yaml:/app/params.yaml:ro

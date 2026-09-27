@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mlops-maintenance-cronjob
+spec:
+  # Ejecuta todos los domingos a las 02:00 AM UTC
+  schedule: "0 2 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: maintenance-worker
+              image: omer022/mlops-news-classifier:latest
+              command:
+                - python
+                - scripts/run_maintenance.py
+                - --full-cycle
+              env:
+                - name: MLFLOW_TRACKING_URI
+                  value: "http://mlflow-service:5000"
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  cpu: "2000m"
+                  memory: "4Gi"

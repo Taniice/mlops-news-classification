@@ -283,3 +283,42 @@ class TestDocs:
     def test_docs_accessible(self, client):
         response = client.get("/docs")
         assert response.status_code == 200
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Token Rate Limiter tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TestTokenRateLimiter:
+    def test_token_status_returns_200(self, client):
+        response = client.get("/token/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "max_questions" in data
+        assert "remaining" in data
+        assert "reset_seconds" in data
+        assert data["max_questions"] == 20
+
+    def test_predict_returns_token_metadata(self, client):
+        response = client.post("/predict", json={"text": "Investigación sobre nuevas energías renovables."})
+        assert response.status_code == 200
+        data = response.json()
+        assert "tokens_remaining" in data
+        assert "reset_seconds" in data
+        assert isinstance(data["tokens_remaining"], int)
+
+    def test_rate_limit_exceeded_returns_429(self, client):
+        from src import serve
+        test_ip = "192.168.1.100"
+        serve.TOKEN_STORE[test_ip] = {
+            "remaining": 0,
+            "reset_time": serve.time.time() + 300
+        }
+        response = client.post(
+            "/predict",
+            json={"text": "Prueba de exceso de cuota."},
+            headers={"X-Forwarded-For": test_ip}
+        )
+        assert response.status_code == 429
+        assert "límite" in response.json()["detail"].lower()
+

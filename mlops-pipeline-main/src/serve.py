@@ -40,6 +40,93 @@ log = logging.getLogger("uvicorn.error")
 ROOT   = Path(__file__).resolve().parent.parent
 PARAMS = yaml.safe_load(open(ROOT / "params.yaml"))
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ⚙️ CONFIGURACIÓN DE LÍMITE DE CONSULTAS / TOKEN RATE LIMIT
+# Modifica estas dos variables para ajustar la cuota de preguntas y el tiempo:
+# ══════════════════════════════════════════════════════════════════════════════
+TOKEN_MAX_QUESTIONS = 20    # <- LÍNEA 47: Cantidad máxima de preguntas por ciclo
+TOKEN_RESET_MINUTES = 2     # <- LÍNEA 48: Minutos tras los cuales se reactiva el token
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Almacén en memoria de cuotas por IP/cliente: { client_ip: {"remaining": int, "reset_time": float} }
+TOKEN_STORE = {}
+
+def get_client_ip(req: Request) -> str:
+    """Extrae la IP real del cliente considerando proxies o peticiones directas."""
+    forwarded = req.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return req.client.host if req.client else "127.0.0.1"
+
+def check_and_consume_token(client_ip: str) -> tuple:
+    """
+    Verifica si el cliente tiene tokens disponibles y descuenta 1.
+    El período de espera de 5 minutos SOLO comienza cuando los tokens se agotan por completo (llegan a 0).
+    Retorna (permitido: bool, restantes: int, segundos_para_reactivacion: int).
+    """
+    now = time.time()
+    reset_window = TOKEN_RESET_MINUTES * 60
+
+    if client_ip not in TOKEN_STORE:
+        TOKEN_STORE[client_ip] = {
+            "remaining": TOKEN_MAX_QUESTIONS,
+            "reset_time": None
+        }
+
+    data = TOKEN_STORE[client_ip]
+
+    # Si se habían agotado y ya pasaron los 5 minutos, reactivar 20 tokens de nuevo
+    if data["remaining"] <= 0 and data["reset_time"] is not None:
+        if now >= data["reset_time"]:
+            data["remaining"] = TOKEN_MAX_QUESTIONS
+            data["reset_time"] = None
+
+    # Si aún no le quedan tokens (sigue en el periodo de 5 minutos de espera)
+    if data["remaining"] <= 0:
+        reset_seconds = max(0, int(data["reset_time"] - now)) if data["reset_time"] else int(reset_window)
+        return False, 0, reset_seconds
+
+    # Consumir un token
+    data["remaining"] -= 1
+
+    # Si este fue el último token disponible (llegó a 0), iniciar el conteo de 5 minutos para reactivar
+    if data["remaining"] == 0:
+        data["reset_time"] = now + reset_window
+        reset_seconds = int(reset_window)
+    else:
+        data["reset_time"] = None
+        reset_seconds = 0
+
+    return True, data["remaining"], reset_seconds
+
+def get_token_status(client_ip: str) -> dict:
+    """Obtiene el estado actual de los tokens del cliente."""
+    now = time.time()
+    reset_window = TOKEN_RESET_MINUTES * 60
+
+    if client_ip not in TOKEN_STORE:
+        TOKEN_STORE[client_ip] = {
+            "remaining": TOKEN_MAX_QUESTIONS,
+            "reset_time": None
+        }
+
+    data = TOKEN_STORE[client_ip]
+
+    # Si estaban en 0 y ya pasaron los 5 minutos, reactivar automáticamente
+    if data["remaining"] <= 0 and data["reset_time"] is not None:
+        if now >= data["reset_time"]:
+            data["remaining"] = TOKEN_MAX_QUESTIONS
+            data["reset_time"] = None
+
+    reset_seconds = max(0, int(data["reset_time"] - now)) if data.get("reset_time") else 0
+    return {
+        "max_questions": TOKEN_MAX_QUESTIONS,
+        "remaining": data["remaining"],
+        "reset_seconds": reset_seconds,
+        "reset_minutes": TOKEN_RESET_MINUTES,
+        "is_exhausted": data["remaining"] <= 0
+    }
+
 # ── Global state ──────────────────────────────────────────────────────────────
 MODEL_STATE = {
     "pipeline"     : None,
@@ -231,6 +318,8 @@ class PredictResponse(BaseModel):
     top_predictions: List[dict]
     model_version: str
     latency_ms: float
+    tokens_remaining: Optional[int] = None
+    reset_seconds: Optional[int] = None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -254,6 +343,13 @@ async def health():
     }
 
 
+@app.get("/token/status", tags=["System"])
+async def token_status(raw_request: Request):
+    """Consulta cuántas preguntas le quedan al usuario y en cuántos segundos se reactiva el token."""
+    client_ip = get_client_ip(raw_request)
+    return get_token_status(client_ip)
+
+
 @app.get("/model/info", tags=["System"])
 async def model_info():
     """Returns model version, metrics, and label mapping."""
@@ -271,15 +367,27 @@ async def model_info():
 
 
 @app.post("/predict", response_model=PredictResponse, tags=["Inference"])
-async def predict(request: PredictRequest):
+async def predict(request: PredictRequest, raw_request: Request):
     """
     Predict news category from text.
 
-    Returns the predicted label, confidence, and top-k probabilities.
+    Returns the predicted label, confidence, top-k probabilities, and remaining query tokens.
     """
     pipeline = MODEL_STATE["pipeline"]
     if pipeline is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
+
+    # ── Validación de Cuota / Token (20 preguntas / 5 minutos) ────────────────
+    client_ip = get_client_ip(raw_request)
+    allowed, remaining, reset_seconds = check_and_consume_token(client_ip)
+    if not allowed:
+        mins = reset_seconds // 60
+        secs = reset_seconds % 60
+        time_str = f"{mins:02d}:{secs:02d}"
+        raise HTTPException(
+            status_code=429,
+            detail=f"Has alcanzado el límite de {TOKEN_MAX_QUESTIONS} preguntas. Tus tokens se reactivarán automáticamente pasados 5 minutos ({time_str} restantes).",
+        )
 
     t0 = time.perf_counter()
 
@@ -309,6 +417,8 @@ async def predict(request: PredictRequest):
         top_predictions = top_predictions,
         model_version   = MODEL_STATE["model_version"],
         latency_ms      = round(latency_ms, 2),
+        tokens_remaining= remaining,
+        reset_seconds   = reset_seconds,
     )
 
 

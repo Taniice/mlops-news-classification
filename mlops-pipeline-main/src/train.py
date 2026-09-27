@@ -330,7 +330,7 @@ EXPERIMENT_CONFIGS = [
 
 def main():
     # ── MLflow setup ──────────────────────────────────────────────────────────
-    tracking_uri = PARAMS["mlflow"]["tracking_uri"]
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", PARAMS["mlflow"]["tracking_uri"])
     exp_name     = PARAMS["mlflow"]["experiment_name"]
 
     mlflow.set_tracking_uri(tracking_uri)
