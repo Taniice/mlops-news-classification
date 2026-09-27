@@ -45,7 +45,7 @@ PARAMS = yaml.safe_load(open(ROOT / "params.yaml"))
 # Modifica estas dos variables para ajustar la cuota de preguntas y el tiempo:
 # ══════════════════════════════════════════════════════════════════════════════
 TOKEN_MAX_QUESTIONS = 20    # <- LÍNEA 47: Cantidad máxima de preguntas por ciclo
-TOKEN_RESET_MINUTES = 2     # <- LÍNEA 48: Minutos tras los cuales se reactiva el token
+TOKEN_RESET_MINUTES = 5     # <- LÍNEA 48: Minutos tras los cuales se reactiva el token
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Almacén en memoria de cuotas por IP/cliente: { client_ip: {"remaining": int, "reset_time": float} }
