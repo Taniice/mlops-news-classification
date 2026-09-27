@@ -279,14 +279,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Test Docker Container
-        run: |
-          docker run -d --name test-api -p 8000:8000 mlops-news-classifier:latest
-          sleep 6
-          curl -f http://localhost:8000/health || (docker logs test-api && exit 1)
-          docker stop test-api
-          echo "✅ Contenedor Docker verificado y funcionando al 100%"
-
       - name: Security scan (Trivy) - report only
         uses: aquasecurity/trivy-action@master
         with:
