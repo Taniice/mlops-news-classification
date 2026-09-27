@@ -30,7 +30,7 @@ dvc-s3>=2.23.0           # optional: for remote DVC storage
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
-httpx>=0.25.0            # async test client for FastAPI
+httpx>=0.28.1            # async test client for FastAPI
 
 # Utilities
 pyyaml>=6.0
