@@ -47,7 +47,6 @@ mlops-pipeline-main/
 │   ├── dependabot.yml              # Configuración de actualización automática de dependencias
 │   └── workflows/
 │       ├── ci.yml                  # Pipeline de Integración Continua (Lint, Tests, Build)
-│       ├── maintenance_retrain.yml # Pipeline de Reentrenamiento y Despliegue Semanal
 │       ├── maintenance_drift.yml   # Pipeline de Monitoreo Diario de Data Drift
 │       └── maintenance_deps.yml    # Pipeline de Auditoría Semanal de Seguridad y Librerías
 ├── data/
