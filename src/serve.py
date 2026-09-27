@@ -154,7 +154,17 @@ def _load_model():
 
     try:
         model_uri = f"models:/{model_name}/{stage}"
-        pipeline  = mlflow.sklearn.load_model(model_uri)
+        trusted_types = [
+            "sklearn.calibration._CalibratedClassifier",
+            "sklearn.calibration._SigmoidCalibration",
+            "sklearn.calibration.CalibratedClassifierCV",
+            "sklearn.svm._classes.LinearSVC",
+            "sklearn.linear_model._logistic.LogisticRegression",
+        ]
+        try:
+            pipeline = mlflow.sklearn.load_model(model_uri, skops_trusted_types=trusted_types)
+        except TypeError:
+            pipeline = mlflow.sklearn.load_model(model_uri)
 
         # Fetch version metadata
         client = mlflow.MlflowClient()

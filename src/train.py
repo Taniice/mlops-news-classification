@@ -213,13 +213,29 @@ def run_experiment(
         signature  = infer_signature(train["text"].head(5), pipeline.predict(train["text"].head(5)))
         input_ex   = train["text"].head(3).tolist()
 
-        mlflow.sklearn.log_model(
-            sk_model       = pipeline,
-            artifact_path  = "model",
-            signature      = signature,
-            input_example  = input_ex,
-            registered_model_name = None,  # we register the best one later
-        )
+        trusted_types = [
+            "sklearn.calibration._CalibratedClassifier",
+            "sklearn.calibration._SigmoidCalibration",
+            "sklearn.calibration.CalibratedClassifierCV",
+            "sklearn.svm._classes.LinearSVC",
+            "sklearn.linear_model._logistic.LogisticRegression",
+        ]
+
+        log_model_kwargs = {
+            "sk_model": pipeline,
+            "artifact_path": "model",
+            "signature": signature,
+            "input_example": input_ex,
+            "registered_model_name": None,  # we register the best one later
+        }
+
+        try:
+            mlflow.sklearn.log_model(
+                **log_model_kwargs,
+                skops_trusted_types=trusted_types,
+            )
+        except TypeError:
+            mlflow.sklearn.log_model(**log_model_kwargs)
 
         # ── Save locally too ──────────────────────────────────────────────────
         model_dir = ROOT / "models"
