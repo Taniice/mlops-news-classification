@@ -11,18 +11,6 @@ on:
       - "params.yaml"
       - "requirements.txt"
       - "Dockerfile"
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-    inputs:
-      force_train:
-        description: "Force model retraining"
-        required: false
-        default: "false"
-      accuracy_threshold:
-        description: "Min accuracy to register model (0-1)"
-        required: false
-        default: "0.87"
 
   schedule:
     - cron: "0 6 * * 0"    
