@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -151,7 +151,7 @@ jobs:
     if: (github.ref == 'refs/heads/main' && github.event_name != 'pull_request') || github.event_name == 'schedule'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -269,7 +269,7 @@ jobs:
     if: (github.ref == 'refs/heads/main' && github.event_name != 'pull_request') || github.event_name == 'schedule'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download ML artifacts from training job
         uses: actions/download-artifact@v4
