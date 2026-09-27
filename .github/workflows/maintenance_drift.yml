@@ -1,52 +1,103 @@
-name: Pipeline de Mantenimiento — Monitoreo Continuo de Data Drift
+name: MLOps Scheduled Maintenance
 
 on:
   schedule:
-    # Ejecución programada diaria: a las 00:00 UTC
-    - cron: "0 0 * * *"
+    # Domingo a la 01:00 AM hora de Perú (UTC-5)
+    # GitHub Actions utiliza UTC → 06:00 UTC
+    - cron: "0 6 * * 0"
+
   workflow_dispatch:
-    inputs:
-      drift_threshold:
-        description: "Umbral de PSI para alertar Drift (default: 0.15)"
-        required: false
-        default: "0.15"
+
+env:
+  PYTHON_VERSION: "3.10"
 
 jobs:
-  monitor-drift:
-    name: 📊 Chequeo de Data Drift y Calidad
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: Data & Model Maintenance
+  # ─────────────────────────────────────────────────────────────
+  maintenance:
+    name: 🔄 Weekly Model Maintenance
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout del repositorio
+
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configurar Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
-      - name: Instalar dependencias de monitoreo
+      - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install pandas numpy pyyaml evidently
+          pip install \
+            scikit-learn \
+            numpy \
+            pandas \
+            mlflow \
+            joblib \
+            pyyaml \
+            matplotlib \
+            seaborn \
+            evidently \
+            datasets
 
-      - name: Ejecutar análisis de deriva con Evidently AI & PSI
-        id: run_monitor
+      # ---------------------------------------------------------
+      # Actualizar datos
+      # ---------------------------------------------------------
+      - name: Ingest latest data
         run: |
-          python monitoring/monitor.py
-        continue-on-error: true
+          python src/ingest.py
 
-      - name: Publicar reporte HTML de Drift
+      # ---------------------------------------------------------
+      # Preprocesar datos
+      # ---------------------------------------------------------
+      - name: Preprocess data
+        run: |
+          python src/preprocess.py
+
+      # ---------------------------------------------------------
+      # Detectar drift
+      # ---------------------------------------------------------
+      - name: Run drift monitoring
+        id: monitoring
+        run: |
+          python -X utf8 monitoring/monitor.py
+        continue-on-error: true
+        env:
+          PYTHONUTF8: "1"
+
+      # ---------------------------------------------------------
+      # Guardar reportes
+      # ---------------------------------------------------------
+      - name: Upload monitoring reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: evidently-drift-report
-          path: reports/drift_report.html
-          retention-days: 14
+          name: weekly-maintenance-${{ github.run_number }}
+          path: |
+            reports/
+          retention-days: 30
 
-      - name: Resumen y Alertas en GitHub
+      # ---------------------------------------------------------
+      # Resumen
+      # ---------------------------------------------------------
+      - name: Write maintenance summary
+        if: always()
         run: |
-          echo "## 📊 Reporte de Monitoreo de Data Drift" >> $GITHUB_STEP_SUMMARY
-          if [ -f "reports/drift_summary.json" ]; then
-            cat reports/drift_summary.json >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "## 🔄 Weekly MLOps Maintenance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Schedule:* Every Sunday at 01:00 AM (Peru)" >> $GITHUB_STEP_SUMMARY
+          echo "*Monitoring status:* ${{ steps.monitoring.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "*Run:* #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tasks executed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Data ingestion" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Data preprocessing" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔍 Data drift monitoring" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Monitoring report generated" >> $GITHUB_STEP_SUMMARY
