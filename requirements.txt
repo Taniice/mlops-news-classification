@@ -20,7 +20,7 @@ evidently>=0.4.11
 
 # FastAPI serving
 fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+uvicorn[standard]>=0.53.0
 pydantic>=2.4.0
 
 # DVC
