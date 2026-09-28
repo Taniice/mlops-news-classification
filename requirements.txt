@@ -24,7 +24,7 @@ uvicorn[standard]>=0.24.0
 pydantic>=2.4.0
 
 # DVC
-dvc>=3.25.0
+dvc>=3.67.1
 dvc-s3>=2.23.0           # optional: for remote DVC storage
 
 # Testing
