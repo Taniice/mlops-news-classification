@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: Builder — install all Python deps
 # ─────────────────────────────────────────────────────────────────────────────
-FROM python:3.10-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ RUN pip install --upgrade pip \
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Runtime — lean production image
 # ─────────────────────────────────────────────────────────────────────────────
-FROM python:3.10-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 WORKDIR /app
 
